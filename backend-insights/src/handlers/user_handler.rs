@@ -1,5 +1,47 @@
 // src/handlers/user_handler.rs
 
+// user_handler.rs
+//
+// 이 모듈은 사용자와 관련된 API 핸들러를 제공합니다.
+// 프론트엔드에서 사용할 수 있는 엔드포인트와 그 사용법은 다음과 같습니다:
+//
+// 1. 사용자 정보 조회
+//    - 엔드포인트: **GET /api/user**
+//    - 설명: 인증된 사용자의 정보를 조회합니다.
+//    - 헤더:
+//      - Authorization: Bearer {JWT 토큰}
+//    - 응답:
+//      - 성공(200 OK):
+//        {
+//            "id": "사용자 ID",
+//            "username": "사용자 이름"
+//        }
+//      - 실패:
+//        - 401 Unauthorized: 토큰이 유효하지 않거나 헤더가 누락된 경우
+//        - 404 Not Found: 사용자를 찾을 수 없는 경우
+//
+// 2. 사용자 정보 업데이트
+//    - 엔드포인트: **PUT /api/user**
+//    - 설명: 인증된 사용자의 정보를 업데이트합니다.
+//    - 헤더:
+//      - Authorization: Bearer {JWT 토큰}
+//    - 요청 바디(JSON):
+//      {
+//          "username": "새로운 사용자 이름",
+//          "password": "새로운 비밀번호" // 선택 사항
+//      }
+//    - 응답:
+//      - 성공(200 OK):
+//        {
+//            "message": "사용자 정보가 업데이트되었습니다."
+//        }
+//      - 실패:
+//        - 400 Bad Request: 잘못된 요청 형식 또는 유효성 검사 실패
+//        - 401 Unauthorized: 토큰이 유효하지 않거나 헤더가 누락된 경우
+//        - 500 Internal Server Error: 서버 오류 발생
+//
+// 각 엔드포인트는 JWT 토큰을 통한 인증이 필요합니다.
+
 use actix_web::{get, put, web, HttpResponse, Responder};
 use mongodb::{Client, bson::doc};
 use serde::Deserialize;
