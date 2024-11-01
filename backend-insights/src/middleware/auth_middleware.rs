@@ -79,27 +79,25 @@ where
         self.service.poll_ready(cx)
     }
 
+// 수정된 인증 미들웨어
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let service = self.service.clone();
         Box::pin(async move {
-            if let Some(auth_header) = req.headers().get("Authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    if auth_str.starts_with("Bearer ") {
-                        let token = auth_str.trim_start_matches("Bearer ").trim();
-                        match verify_jwt(token) {
-                            Ok(user_id) => {
-                                req.extensions_mut().insert(AuthorizedUser { id: user_id });
-                                service.call(req).await
-                            }
-                            Err(_) => Err(AppError::InvalidToken.into()),
-                        }
-                    } else {
-                        Err(AppError::InvalidToken.into())
+            // HTTP-Only 쿠키에서 "token" 추출
+            if let Some(cookie) = req.cookie("token") {
+                let token = cookie.value();
+                // JWT 토큰 검증
+                match verify_jwt(token) {
+                    Ok(user_id) => {
+                        // 인증된 사용자 정보 삽입
+                        req.extensions_mut().insert(AuthorizedUser { id: user_id });
+                        // 다음 서비스 호출
+                        service.call(req).await
                     }
-                } else {
-                    Err(AppError::InvalidToken.into())
+                    Err(_) => Err(AppError::InvalidToken.into()),
                 }
             } else {
+                // 토큰이 없을 경우 에러 반환
                 Err(AppError::MissingToken.into())
             }
         })
