@@ -83,6 +83,11 @@ pub async fn register(
         return Err(AppError::EmailAlreadyExists);
     }
 
+    let existing = cache.find_one(doc! { "email": &data.email }, None).await?;
+    if existing.is_some() {
+        cache.delete_one(doc! { "email": &data.email }, None).await?;
+    }
+
     // Generate random 6-digit code
     let code: u32 = rand::thread_rng().gen_range(100_000..1_000_000);
 
@@ -204,6 +209,11 @@ pub async fn login(
             return Err(AppError::DatabaseError(e.to_string()));
         }
     };
+
+    let cache = client.database("mydb").collection::<Document>("cache");
+    if cache.find_one(doc! { "email": &data.email, "action": "login" }, None).await?.is_some() {
+        cache.delete_one(doc! { "email": &data.email, "action": "login" }, None).await?;
+    }
 
     // Generate random 6-digit code
     let code: u32 = rand::thread_rng().gen_range(100_000..1_000_000);
