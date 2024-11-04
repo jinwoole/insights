@@ -1,6 +1,10 @@
 <script>
     let username = '';
     let password = '';
+    let email = '';
+    let verificationCode = '';
+    let isRegistering = true;
+    let isVerifying = false;
 
     async function register() {
         const response = await fetch('http://localhost:8080/api/auth/register', {
@@ -8,35 +12,38 @@
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, email })
         });
 
         if (response.ok) {
-            // Handle success
-            console.log('Registration successful');
+            isVerifying = true;
+            isRegistering = false;
+            console.log('Verification code sent to email');
         } else {
-            // Handle error
             const error = await response.json();
             console.error('Registration failed:', error);
         }
     }
 
-    async function login() {
-        const response = await fetch('http://localhost:8080/api/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, password }),
-            credentials: 'include' // Include cookies in the request
-        });
+    async function verifyRegister() {
+        try {
+            const response = await fetch('http://localhost:8080/api/auth/verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, email, code: Number(verificationCode), action: "register" }),
+                credentials: 'include'
+            });
 
-        if (response.ok) {
-            // The token is now stored in an HTTP-only cookie
-            console.log('Login successful');
-        } else {
-            const error = await response.json();
-            console.error('Login failed:', error);
+            if (response.ok) {
+                console.log('Registration verified successfully');
+            } else {
+                const errorText = await response.text();
+                console.error('Verification failed:', errorText);
+            }
+        } catch (err) {
+            console.error('An unexpected error occurred:', err);
         }
     }
 
@@ -73,8 +80,6 @@
             console.error('Update failed:', error);
         }
     }
-
-
 </script>
 
 <form on:submit|preventDefault={register} class="space-y-4 p-4 border rounded-md shadow-md">
@@ -86,8 +91,8 @@
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-700">
-            Password:
-            <input type="password" bind:value={password} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+            Email:
+            <input type="email" bind:value={email} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
         </label>
     </div>
     <div>
@@ -97,25 +102,21 @@
     </div>
 </form>
 
-<form on:submit|preventDefault={login} class="space-y-4 p-4 border rounded-md shadow-md mt-6">
-    <div>
-        <label class="block text-sm font-medium text-gray-700">
-            Username:
-            <input type="text" bind:value={username} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-        </label>
-    </div>
-    <div>
-        <label class="block text-sm font-medium text-gray-700">
-            Password:
-            <input type="password" bind:value={password} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-        </label>
-    </div>
-    <div>
-        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            Login
-        </button>
-    </div>
-</form>
+{#if isVerifying}
+    <form on:submit|preventDefault={verifyRegister} class="space-y-4 p-4 border rounded-md shadow-md">
+        <div>
+            <label class="block text-sm font-medium text-gray-700">
+                Verification Code:
+                <input type="text" bind:value={verificationCode} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+            </label>
+        </div>
+        <div>
+            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Verify
+            </button>
+        </div>
+    </form>
+{/if}
 
 <form on:submit|preventDefault={getUserInfo} class="space-y-4 p-4 border rounded-md shadow-md mt-6">
     <div>

@@ -8,5 +8,5 @@ pub struct User {
     #[serde(rename = "_id")]
     pub id: ObjectId, // ObjectId로 정의
     pub username: String,
-    pub password: String, // `skip_serializing` 제거
+    pub email: String, // `skip_serializing` 제거
 }
