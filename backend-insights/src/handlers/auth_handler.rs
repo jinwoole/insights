@@ -1,3 +1,5 @@
+use core::prelude;
+
 use actix_web::{post, web, HttpResponse, Responder, cookie::Cookie};
 use mongodb::Client;
 use serde::{Deserialize, Serialize};
@@ -16,27 +18,39 @@ use crate::errors::AppError;
 use bson::oid::ObjectId;
 
 
-// Update AuthData to include username and email
+// Separate structs for registration and login
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AuthData {
+pub struct RegisterData {
     pub username: String,
+    pub email: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginData {
     pub email: String,
 }
 
 // Modify VerificationData to include action
 #[derive(Debug, Serialize, Deserialize)]
-pub struct VerificationData {
+pub struct VerificationRegisterData {
     pub username: String,
     pub email: String,
     pub code: u32,
-    pub action: String, // "register" or "login"
 }
+
+// Modify VerificationData to include action
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VerificationLoginData {
+    pub email: String,
+    pub code: u32,
+}
+
 
 // First endpoint: receive username and email, generate code, store in cache
 #[post("/auth/register")]
 pub async fn register(
     client: web::Data<Client>,
-    data: web::Json<AuthData>,
+    data: web::Json<RegisterData>,
 ) -> Result<impl Responder, AppError> {
     let users = client.database("mydb").collection::<User>("users");
     let cache = client.database("mydb").collection::<Document>("cache");
@@ -84,11 +98,11 @@ pub async fn register(
     Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "ok" })))
 }
 
-// Update the verify endpoint to handle both register and login actions
-#[post("/auth/verify")]
-pub async fn verify(
+// Verify Registration
+#[post("/auth/verify/register")]
+pub async fn verify_register(
     client: web::Data<Client>,
-    data: web::Json<VerificationData>,
+    data: web::Json<VerificationRegisterData>,
 ) -> Result<impl Responder, AppError> {
     let cache = client.database("mydb").collection::<Document>("cache");
 
@@ -100,17 +114,15 @@ pub async fn verify(
     };
 
     let cache_entry = cache.find_one(filter.clone(), None).await?;
-    if cache_entry.is_none() {
-        return Err(AppError::InvalidOrExpiredCode);
-    }
+    if let Some(entry) = cache_entry {
+        let username = entry.get_str("username").map_err(|_| AppError::InvalidOrExpiredCode)?.to_string();
 
-    if data.action == "register" {
         let users = client.database("mydb").collection::<User>("users");
 
         // Create new user
         let new_user = User {
             id: ObjectId::new(),
-            username: data.username.clone(),
+            username,
             email: data.email.clone(),
             // Initialize other fields as needed
         };
@@ -131,10 +143,29 @@ pub async fn verify(
         Ok(HttpResponse::Ok()
             .cookie(cookie)
             .finish())
-    } else if data.action == "login" {
-        let users = client.database("mydb").collection::<User>("users");
+    } else {
+        Err(AppError::InvalidOrExpiredCode)
+    }
+}
 
-        let user = users.find_one(doc! { "username": &data.username }, None).await?
+// Verify Login
+#[post("/auth/verify/login")]
+pub async fn verify_login(
+    client: web::Data<Client>,
+    data: web::Json<VerificationLoginData>,
+) -> Result<impl Responder, AppError> {
+    let cache = client.database("mydb").collection::<Document>("cache");
+
+    // Check if code is valid
+    let filter = doc! {
+        "email": &data.email,
+        "code": data.code,
+    };
+
+    let cache_entry = cache.find_one(filter.clone(), None).await?;
+    if let Some(_entry) = cache_entry {
+        let users = client.database("mydb").collection::<User>("users");
+        let user = users.find_one(doc! { "email": &data.email }, None).await?
             .ok_or(AppError::UserNotFound)?;
 
         let token = generate_jwt(&user.id.to_hex())?;
@@ -156,15 +187,16 @@ pub async fn verify(
     }
 }
 
-// Update the login endpoint to use 6-digit code verification
+// Update the login endpoint to use LoginData
 #[post("/auth/login")]
 pub async fn login(
     client: web::Data<Client>,
-    data: web::Json<AuthData>,
+    data: web::Json<LoginData>,
 ) -> Result<impl Responder, AppError> {
     let collection = client.database("mydb").collection::<User>("users");
 
-    let user = match collection.find_one(doc! { "username": &data.username }, None).await {
+
+    let user = match collection.find_one(doc! { "email": &data.email }, None).await {
         Ok(Some(user)) => user,
         Ok(None) => return Err(AppError::UserNotFound),
         Err(e) => {
@@ -177,8 +209,8 @@ pub async fn login(
     let code: u32 = rand::thread_rng().gen_range(100_000..1_000_000);
 
     let cache_entry = doc! {
-        "username": &data.username,
-        "email": &user.email,
+        "username": &user.username,
+        "email": &data.email,
         "code": code,
         "action": "login",
         "createdAt": bson::DateTime::from_millis(Utc::now().timestamp_millis()),
@@ -194,5 +226,6 @@ pub async fn login(
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(register);
     cfg.service(login);
-    cfg.service(verify);
+    cfg.service(verify_register);
+    cfg.service(verify_login);
 }
