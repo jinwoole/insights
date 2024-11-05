@@ -7,7 +7,6 @@ use serde::Deserialize;
 use crate::middleware::auth_middleware::AuthorizedUser;
 use crate::models::user::User;
 use crate::models::user_response::UserResponse;
-use crate::utils::hash::hash_password;
 use crate::errors::AppError;
 
 // Handler to retrieve user information
@@ -41,7 +40,6 @@ pub async fn get_user(
 #[derive(Deserialize)]
 pub struct UpdateData {
     pub username: Option<String>,
-    pub password: Option<String>,
 }
 
 // 사용자 정보를 업데이트하는 핸들러
@@ -78,12 +76,6 @@ pub async fn update_user(
     // 사용자 이름이 제공되면 업데이트 문서에 추가
     if let Some(username) = &data.username {
         update_doc.insert("username", username.clone());
-    }
-
-    // 비밀번호가 제공되면 해시하여 업데이트 문서에 추가
-    if let Some(password) = &data.password {
-        let hashed_password = hash_password(password)?;
-        update_doc.insert("password", hashed_password);
     }
 
     // 사용자 ID로 해당 사용자 업데이트

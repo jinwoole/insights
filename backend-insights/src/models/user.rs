@@ -6,7 +6,7 @@ use bson::oid::ObjectId;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
     #[serde(rename = "_id")]
-    pub id: ObjectId, // ObjectId로 정의
+    pub id: ObjectId,
     pub username: String,
-    pub email: String, // `skip_serializing` 제거
+    pub email: String,
 }

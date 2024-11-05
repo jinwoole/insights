@@ -79,7 +79,6 @@ where
         self.service.poll_ready(cx)
     }
 
-// 수정된 인증 미들웨어
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let service = self.service.clone();
         Box::pin(async move {

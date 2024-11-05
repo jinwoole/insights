@@ -1,12 +1,11 @@
 // src/main.rs
 
-use actix_web::{App, HttpServer, dev::ServiceRequest, dev::ServiceResponse};
-use actix_service::Service; // 추가: Service 트레이트를 가져옵니다.
+use actix_web::{App, HttpServer, dev::ServiceRequest};
+use actix_service::Service;
 use actix_web::http::header;
 use actix_cors::Cors;
 use dotenv::dotenv;
 use std::env;
-use futures::future::{ok, Ready};
 
 mod db;
 mod handlers;

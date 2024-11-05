@@ -26,7 +26,7 @@ pub fn generate_jwt(user_id: &str) -> Result<String, AppError> {
     };
 
     encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_ref()))
-        .map_err(|e| AppError::TokenCreationError)
+        .map_err(|_e| AppError::TokenCreationError)
 }
 
 pub fn verify_jwt(token: &str) -> Result<ObjectId, AppError> {
@@ -35,8 +35,8 @@ pub fn verify_jwt(token: &str) -> Result<ObjectId, AppError> {
         token,
         &DecodingKey::from_secret(secret.as_ref()),
         &Validation::new(Algorithm::HS256),
-    ).map_err(|e| AppError::InvalidToken)?;
+    ).map_err(|_e| AppError::InvalidToken)?;
 
     let user_id_str = token_data.claims.sub;
-    ObjectId::parse_str(&user_id_str).map_err(|e| AppError::InvalidToken)
+    ObjectId::parse_str(&user_id_str).map_err(|_e| AppError::InvalidToken)
 }

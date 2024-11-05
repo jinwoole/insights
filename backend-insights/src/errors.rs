@@ -6,7 +6,6 @@ use std::fmt;
 #[derive(Debug)]
 pub enum AppError {
     InternalError,
-    InvalidCredentials,
     UserNotFound,
     InvalidToken,
     MissingToken,
@@ -22,7 +21,6 @@ impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AppError::InternalError => write!(f, "내부 서버 오류"),
-            AppError::InvalidCredentials => write!(f, "잘못된 자격 증명"),
             AppError::UserNotFound => write!(f, "사용자를 찾을 수 없습니다."),
             AppError::InvalidToken => write!(f, "잘못된 토큰"),
             AppError::MissingToken => write!(f, "토큰 누락"),
@@ -39,13 +37,12 @@ impl fmt::Display for AppError {
 impl ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            AppError::InvalidCredentials
-            | AppError::UserNotFound
+            AppError::UserNotFound
             | AppError::InvalidToken
             | AppError::MissingToken => {
                 HttpResponse::Unauthorized().json(serde_json::json!({ "error": self.to_string() }))
             }
-            AppError::DatabaseError(msg) => {
+            AppError::DatabaseError(_msg) => {
                 HttpResponse::InternalServerError().json(serde_json::json!({ "error": self.to_string() }))
             }
             AppError::UserAlreadyExists
@@ -59,7 +56,6 @@ impl ResponseError for AppError {
         }
     }
 }
-
 impl From<mongodb::error::Error> for AppError {
     fn from(err: mongodb::error::Error) -> Self {
         AppError::DatabaseError(err.to_string())

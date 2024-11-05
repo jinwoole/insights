@@ -1,7 +1,6 @@
 // src/models/user_response.rs
 
 use serde::Serialize;
-use bson::oid::ObjectId;
 
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
