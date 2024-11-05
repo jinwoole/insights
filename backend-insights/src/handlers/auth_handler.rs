@@ -13,18 +13,18 @@
 //! ## 인증 프로세스
 //! 
 //! ### 회원가입 과정:
-//! 1. 사용자가 사용자명과 이메일 제출 (`/auth/register`)
+//! 1. 사용자가 사용자명과 이메일 제출 (`/register`)
 //! 2. 시스템이 기존 사용자명/이메일 중복 확인
 //! 3. 6자리 인증 코드 생성
 //! 4. 3분 유효기간으로 캐시에 코드 저장
-//! 5. 사용자가 인증 코드 확인 (`/auth/verify/register`)
+//! 5. 사용자가 인증 코드 확인 (`/verify/register`)
 //! 6. 시스템이 사용자 계정 생성 및 JWT 발급
 //! 
 //! ### 로그인 과정:
-//! 1. 사용자가 이메일 제출 (`/auth/login`)
+//! 1. 사용자가 이메일 제출 (`/login`)
 //! 2. 시스템이 6자리 인증 코드 생성
 //! 3. 3분 유효기간으로 캐시에 코드 저장
-//! 4. 사용자가 인증 코드 확인 (`/auth/verify/login`)
+//! 4. 사용자가 인증 코드 확인 (`/verify/login`)
 //! 5. 시스템이 보안 쿠키로 JWT 발급
 //! 
 //! ## 보안 기능
@@ -70,6 +70,7 @@ use crate::models::user::User;
 use crate::utils::jwt::generate_jwt;
 use crate::errors::AppError;
 use bson::oid::ObjectId;
+use crate::middleware::log_middleware::LogMiddleware;
 
 // 회원가입 시 필요한 데이터 구조체입니다.
 #[derive(Debug, Serialize, Deserialize)]
@@ -100,13 +101,13 @@ pub struct VerificationLoginData {
 }
 
 // 첫 번째 엔드포인트: 사용자명과 이메일을 받아서 코드 생성 후 캐시에 저장합니다.
-#[post("/auth/register")]
+#[post("/register")]
 pub async fn register(
     client: web::Data<Client>,
     data: web::Json<RegisterData>,
 ) -> Result<impl Responder, AppError> {
-    let users = client.database("mydb").collection::<User>("users");
-    let cache = client.database("mydb").collection::<Document>("cache");
+    let users = client.database("insights").collection::<User>("users");
+    let cache = client.database("insights").collection::<Document>("cache");
 
     // "createdAt" 필드에 TTL 인덱스를 생성합니다.
     let index_options = IndexOptions::builder()
@@ -157,12 +158,12 @@ pub async fn register(
 }
 
 // 회원가입 인증을 처리합니다.
-#[post("/auth/verify/register")]
+#[post("/verify/register")]
 pub async fn verify_register(
     client: web::Data<Client>,
     data: web::Json<VerificationRegisterData>,
 ) -> Result<impl Responder, AppError> {
-    let cache = client.database("mydb").collection::<Document>("cache");
+    let cache = client.database("insights").collection::<Document>("cache");
 
     // 코드가 유효한지 확인합니다.
     let filter = doc! {
@@ -175,7 +176,7 @@ pub async fn verify_register(
     if let Some(entry) = cache_entry {
         let username = entry.get_str("username").map_err(|_| AppError::InvalidOrExpiredCode)?.to_string();
 
-        let users = client.database("mydb").collection::<User>("users");
+        let users = client.database("insights").collection::<User>("users");
 
         // 새로운 사용자를 생성합니다.
         let new_user = User {
@@ -207,12 +208,12 @@ pub async fn verify_register(
 }
 
 // 로그인 인증을 처리합니다.
-#[post("/auth/verify/login")]
+#[post("/verify/login")]
 pub async fn verify_login(
     client: web::Data<Client>,
     data: web::Json<VerificationLoginData>,
 ) -> Result<impl Responder, AppError> {
-    let cache = client.database("mydb").collection::<Document>("cache");
+    let cache = client.database("insights").collection::<Document>("cache");
 
     // 코드가 유효한지 확인합니다.
     let filter = doc! {
@@ -222,7 +223,7 @@ pub async fn verify_login(
 
     let cache_entry = cache.find_one(filter.clone(), None).await?;
     if let Some(_entry) = cache_entry {
-        let users = client.database("mydb").collection::<User>("users");
+        let users = client.database("insights").collection::<User>("users");
         let user = users.find_one(doc! { "email": &data.email }, None).await?
             .ok_or(AppError::UserNotFound)?;
 
@@ -246,24 +247,23 @@ pub async fn verify_login(
 }
 
 // Update the login endpoint to use LoginData
-#[post("/auth/login")]
+#[post("/login")]
 pub async fn login(
     client: web::Data<Client>,
     data: web::Json<LoginData>,
 ) -> Result<impl Responder, AppError> {
-    let collection = client.database("mydb").collection::<User>("users");
+    let collection = client.database("insights").collection::<User>("users");
 
     // 사용자를 검색합니다.
     let user = match collection.find_one(doc! { "email": &data.email }, None).await {
         Ok(Some(user)) => user,
         Ok(None) => return Err(AppError::UserNotFound),
         Err(e) => {
-            println!("Database Find Error: {}", e);
             return Err(AppError::DatabaseError(e.to_string()));
         }
     };
 
-    let cache = client.database("mydb").collection::<Document>("cache");
+    let cache = client.database("insights").collection::<Document>("cache");
     if cache.find_one(doc! { "email": &data.email, "action": "login" }, None).await?.is_some() {
         cache.delete_one(doc! { "email": &data.email, "action": "login" }, None).await?;
     }
@@ -279,17 +279,10 @@ pub async fn login(
         "createdAt": bson::DateTime::from_millis(Utc::now().timestamp_millis()),
     };
 
-    client.database("mydb").collection::<Document>("cache").insert_one(cache_entry, None).await?;
+    client.database("insights").collection::<Document>("cache").insert_one(cache_entry, None).await?;
 
     // TODO: 사용자의 이메일로 코드를 전송합니다.
 
     Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "Verification code sent" })))
 }
 
-// 엔드포인트를 초기화합니다.
-pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(register);
-    cfg.service(login);
-    cfg.service(verify_register);
-    cfg.service(verify_login);
-}

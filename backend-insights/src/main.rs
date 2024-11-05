@@ -32,17 +32,18 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(cors)
+                        // main.rs의 wrap_fn 부분을 좀 더 자세히 수정
             .wrap_fn(|req: ServiceRequest, srv| {
-                println!("Incoming request: {} {}", req.method(), req.path());
                 let fut = srv.call(req);
                 async {
                     match fut.await {
                         Ok(res) => {
-                            println!(": {}", res.status());
+                            println!("Response status: {}", res.status());
+                            println!("Response headers: {:?}", res.headers());  // 응답 헤더도 확인
                             Ok(res)
                         },
                         Err(err) => {
-                            println!("Request error: {}", err);
+                            println!("Error: {}", err);
                             Err(err)
                         },
                     }

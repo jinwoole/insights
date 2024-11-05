@@ -1,35 +1,3 @@
-// src/middleware/auth_middleware.rs
-//
-// 이 모듈은 JWT 토큰을 이용한 인증 미들웨어를 제공합니다.
-// 프론트엔드에서 API 요청 시 인증이 필요한 엔드포인트에 대해 이 미들웨어를 적용하여
-// 사용자의 인증 상태를 확인합니다.
-//
-// ### 미들웨어 기능:
-// - 모든 요청에 대해 JWT 토큰의 유효성을 검사합니다.
-// - 유효한 토큰이 없을 경우 401 Unauthorized 에러를 반환합니다.
-// - 유효한 토큰이 있을 경우 요청을 다음 서비스로 전달합니다.
-//
-// ### 프론트엔드 사용 방법:
-// - 인증이 필요한 API 요청 시 HTTP 헤더에 JWT 토큰을 포함해야 합니다.
-//   - 헤더 이름: `Authorization`
-//   - 형식: `Authorization: Bearer {JWT 토큰}`
-// - 토큰이 만료되었거나 유효하지 않은 경우 재로그인이 필요할 수 있습니다.
-//
-// ### 예시:
-// ```http
-// GET /api/protected-endpoint HTTP/1.1
-// Host: example.com
-// Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ...
-// ```
-//
-// ### 참고 사항:
-// - 이 미들웨어는 서버의 모든 보호된 엔드포인트에 적용됩니다.
-// - 프론트엔드에서는 토큰 관리(저장, 갱신, 삭제)를 적절히 구현해야 합니다.
-// - 토큰이 없는 상태로 보호된 엔드포인트에 접근하면 401 에러가 발생합니다.
-//
-// 이 미들웨어를 통해 백엔드 서버는 인증된 사용자만이 특정 자원에 접근하도록 보호합니다.
-// 프론트엔드에서는 사용자 로그인 후 받은 JWT 토큰을 지속적으로 관리하고 요청마다 헤더에 포함시켜야 합니다.
-
 
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
