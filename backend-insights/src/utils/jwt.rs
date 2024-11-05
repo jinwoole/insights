@@ -16,7 +16,7 @@ struct Claims {
 pub fn generate_jwt(user_id: &str) -> Result<String, AppError> {
     let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(24))
+        .checked_add_signed(Duration::hours(12))
         .expect("valid timestamp")
         .timestamp() as usize;
 

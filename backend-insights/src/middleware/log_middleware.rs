@@ -6,7 +6,6 @@ use actix_web::{
 use futures::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
 use std::task::{Context, Poll};
-use crate::errors::AppError;
 
 use mongodb::Client;
 use mongodb::bson::doc;
@@ -14,7 +13,7 @@ use mongodb::bson::doc;
 // Define the LogMiddleware struct
 pub struct LogMiddleware;
 
-// Implement the Transform trait for LogMiddleware
+// Implement the Transform trait for LogMiddleware  
 impl<S, B> Transform<S, ServiceRequest> for LogMiddleware
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
@@ -69,7 +68,7 @@ where
                 let ttl_index = mongodb::IndexModel::builder()
                     .keys(doc! { "timestamp": 1 })
                     .options(mongodb::options::IndexOptions::builder()
-                        .expire_after(Some(31536000)) // 1 year in seconds
+                        .expire_after(Some(std::time::Duration::from_secs(31536000))) // 1 year in seconds
                         .build())
                     .build();
                 let _ = logs_collection.create_index(ttl_index, None).await;

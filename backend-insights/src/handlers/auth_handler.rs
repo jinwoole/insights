@@ -70,7 +70,6 @@ use crate::models::user::User;
 use crate::utils::jwt::generate_jwt;
 use crate::errors::AppError;
 use bson::oid::ObjectId;
-use crate::middleware::log_middleware::LogMiddleware;
 
 // 회원가입 시 필요한 데이터 구조체입니다.
 #[derive(Debug, Serialize, Deserialize)]
