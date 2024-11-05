@@ -108,17 +108,15 @@ pub async fn register(
     let users = client.database("insights").collection::<User>("users");
     let cache = client.database("insights").collection::<Document>("cache");
 
-    // "createdAt" 필드에 TTL 인덱스를 생성합니다.
-    let index_options = IndexOptions::builder()
-        .expire_after(Some(std::time::Duration::from_secs(180)))
-        .build();
-    let index_model = IndexModel::builder()
-        .keys(doc! { "createdAt": 1 })
-        .options(index_options)
-        .build();
-    cache.create_index(index_model, None).await?;
+    if data.username.trim().is_empty() {
+        return Err(AppError::InvalidInput("Username Error".to_string()));
+    }
+    
+    if data.email.trim().is_empty() {
+        return Err(AppError::InvalidInput("Email Error".to_string()));
+    }
 
-    // 이미 존재하는 사용자명인지 확인합니다.
+        // 이미 존재하는 사용자명인지 확인합니다.
     if users
         .find_one(doc! { "username": &data.username }, None)
         .await?
@@ -140,6 +138,16 @@ pub async fn register(
     if existing.is_some() {
         cache.delete_one(doc! { "email": &data.email }, None).await?;
     }
+
+    // "createdAt" 필드에 TTL 인덱스를 생성합니다.
+    let index_options = IndexOptions::builder()
+        .expire_after(Some(std::time::Duration::from_secs(180)))
+        .build();
+    let index_model = IndexModel::builder()
+        .keys(doc! { "createdAt": 1 })
+        .options(index_options)
+        .build();
+    cache.create_index(index_model, None).await?;
 
     // 랜덤한 6자리 코드를 생성합니다.
     let code: u32 = rand::thread_rng().gen_range(100_000..1_000_000);

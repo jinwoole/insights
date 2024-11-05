@@ -3,7 +3,7 @@ pub mod user_handler;
 
 use actix_web::web;
 use auth_handler::{login, register, verify_login, verify_register};
-use user_handler::get_user;
+use user_handler::{get_user, change_username};
 use crate::middleware::log_middleware::LogMiddleware;
 use crate::middleware::auth_middleware::AuthMiddleware;
 
@@ -17,6 +17,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
                 // 인증이 필요한 엔드포인트들
                 web::scope("/user")
                     .service(get_user)
+                    .service(change_username)
                     .wrap(AuthMiddleware)
             )
             .service(

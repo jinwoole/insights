@@ -15,6 +15,7 @@ pub enum AppError {
     UserAlreadyExists,
     EmailAlreadyExists, // 새로운 에러 추가
     InvalidOrExpiredCode, // 새로운 에러 추가
+    InvalidInput(String), // New variant added
 }
 
 impl fmt::Display for AppError {
@@ -30,6 +31,7 @@ impl fmt::Display for AppError {
             AppError::UserAlreadyExists => write!(f, "사용자가 이미 존재함"),
             AppError::EmailAlreadyExists => write!(f, "이미 이메일이 존재합니다."),
             AppError::InvalidOrExpiredCode => write!(f, "유효하지 않거나 만료된 코드입니다."),
+            AppError::InvalidInput(msg) => write!(f, "유효하지 않은 입력: {}", msg),
         }
     }
 }
@@ -50,6 +52,9 @@ impl ResponseError for AppError {
                 HttpResponse::Conflict().json(serde_json::json!({ "error": self.to_string() }))
             }
             AppError::InvalidOrExpiredCode => {
+                HttpResponse::BadRequest().json(serde_json::json!({ "error": self.to_string() }))
+            }
+            AppError::InvalidInput(_msg) => {
                 HttpResponse::BadRequest().json(serde_json::json!({ "error": self.to_string() }))
             }
             _ => HttpResponse::InternalServerError().json(serde_json::json!({ "error": "Internal Server Error" })),
