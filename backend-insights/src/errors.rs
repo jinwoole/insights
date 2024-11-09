@@ -13,7 +13,7 @@ pub enum AppError {
     HashingError,
     TokenCreationError,
     UserAlreadyExists,
-    EmailAlreadyExists, // 새로운 에러 추가
+    EmailError(String), // added
     InvalidOrExpiredCode, // 새로운 에러 추가
     InvalidInput(String), // New variant added
 }
@@ -29,7 +29,7 @@ impl fmt::Display for AppError {
             AppError::HashingError => write!(f, "해싱 오류"),
             AppError::TokenCreationError => write!(f, "토큰 생성 오류"),
             AppError::UserAlreadyExists => write!(f, "사용자가 이미 존재함"),
-            AppError::EmailAlreadyExists => write!(f, "이미 이메일이 존재합니다."),
+            AppError::EmailError(msg) => write!(f, "Email error: {}", msg),
             AppError::InvalidOrExpiredCode => write!(f, "유효하지 않거나 만료된 코드입니다."),
             AppError::InvalidInput(msg) => write!(f, "유효하지 않은 입력: {}", msg),
         }
@@ -48,7 +48,7 @@ impl ResponseError for AppError {
                 HttpResponse::InternalServerError().json(serde_json::json!({ "error": self.to_string() }))
             }
             AppError::UserAlreadyExists
-            | AppError::EmailAlreadyExists => {
+            | AppError::EmailError(_) => {
                 HttpResponse::Conflict().json(serde_json::json!({ "error": self.to_string() }))
             }
             AppError::InvalidOrExpiredCode => {

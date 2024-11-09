@@ -70,6 +70,9 @@ use crate::models::user::User;
 use crate::utils::jwt::generate_jwt;
 use crate::errors::AppError;
 use bson::oid::ObjectId;
+use lettre::message::header::ContentType;
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::{Message, SmtpTransport, Transport};
 
 // 회원가입 시 필요한 데이터 구조체입니다.
 #[derive(Debug, Serialize, Deserialize)]
@@ -131,7 +134,7 @@ pub async fn register(
         .await?
         .is_some()
     {
-        return Err(AppError::EmailAlreadyExists);
+        return Err(AppError::UserAlreadyExists);
     }
 
     let existing = cache.find_one(doc! { "email": &data.email }, None).await?;
@@ -158,6 +161,8 @@ pub async fn register(
         "code": code,
         "createdAt": bson::DateTime::from_millis(Utc::now().timestamp_millis()),
     };
+
+    send_verification_email(&data.email, code).await?;
 
     cache.insert_one(cache_entry, None).await?;
 
@@ -288,8 +293,35 @@ pub async fn login(
 
     client.database("insights").collection::<Document>("cache").insert_one(cache_entry, None).await?;
 
-    // TODO: 사용자의 이메일로 코드를 전송합니다.
+    send_verification_email(&data.email, code).await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "Verification code sent" })))
 }
 
+// Email sending function
+pub async fn send_verification_email(email: &str, code: u32) -> Result<(), AppError> {
+    let smtp_credentials = Credentials::new(
+        "forcloudmusic@gmail.com".to_string(),
+        "bhjbjtdxshxsmlky".to_string(),
+    );
+
+    let mailer = SmtpTransport::relay("smtp.gmail.com")
+        .unwrap()
+        .credentials(smtp_credentials)
+        .build();
+
+    let email_content = format!("Your verification code is: {}", code);
+
+    let email = Message::builder()
+        .from("forcloudmusic@gmail.com".parse().unwrap())
+        .to(email.parse().unwrap())
+        .subject("Verification Code")
+        .header(ContentType::TEXT_PLAIN)
+        .body(email_content)
+        .unwrap();
+
+    mailer.send(&email)
+        .map_err(|e| AppError::EmailError(e.to_string()))?;
+
+    Ok(())
+}
