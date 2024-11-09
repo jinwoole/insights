@@ -7,7 +7,7 @@ use actix_cors::Cors;
 use dotenv::dotenv;
 use std::env;
 
-mod db;
+mod clients;
 mod handlers;
 mod middleware;
 mod models;
@@ -17,7 +17,8 @@ mod errors;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
-    let db_client = db::init_db().await.expect("Failed to connect to the database");
+    let db_client = clients::init_db().await.expect("Failed to connect to the database");
+    let ses_client = clients::init_ses_client().await.expect("Failed to connect to SES");
 
     let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
     println!("Server running at http://{}", host);
@@ -32,7 +33,6 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(cors)
-                        // main.rs의 wrap_fn 부분을 좀 더 자세히 수정
             .wrap_fn(|req: ServiceRequest, srv| {
                 let fut = srv.call(req);
                 async {
@@ -50,6 +50,7 @@ async fn main() -> std::io::Result<()> {
                 }
             })
             .app_data(actix_web::web::Data::new(db_client.clone()))
+            .app_data(actix_web::web::Data::new(ses_client.clone()))
             .configure(handlers::init)
     })
     .bind(host)?

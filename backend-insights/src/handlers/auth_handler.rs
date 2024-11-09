@@ -40,7 +40,7 @@
 //! * `RegisterData`: 회원가입용 사용자명과 이메일
 //! * `LoginData`: 로그인용 이메일
 //! * `VerificationRegisterData`: 회원가입 인증 데이터
-//! * `VerificationLoginData`: 로그인 인증 데이터
+//! * `VerificationLoginData`: 로그인 ���증 데이터
 //! 
 //! ## 사용된 크레이트
 //! 
@@ -70,9 +70,6 @@ use crate::models::user::User;
 use crate::utils::jwt::generate_jwt;
 use crate::errors::AppError;
 use bson::oid::ObjectId;
-use lettre::message::header::ContentType;
-use lettre::transport::smtp::authentication::Credentials;
-use lettre::{Message, SmtpTransport, Transport};
 
 // 회원가입 시 필요한 데이터 구조체입니다.
 #[derive(Debug, Serialize, Deserialize)]
@@ -106,11 +103,11 @@ pub struct VerificationLoginData {
 #[post("/register")]
 pub async fn register(
     client: web::Data<Client>,
+    ses_client: web::Data<sesClient>, // Get SES client from app data
     data: web::Json<RegisterData>,
 ) -> Result<impl Responder, AppError> {
     let users = client.database("insights").collection::<User>("users");
     let cache = client.database("insights").collection::<Document>("cache");
-
     if data.username.trim().is_empty() {
         return Err(AppError::InvalidInput("Username Error".to_string()));
     }
@@ -161,8 +158,10 @@ pub async fn register(
         "code": code,
         "createdAt": bson::DateTime::from_millis(Utc::now().timestamp_millis()),
     };
+    
 
-    send_verification_email(&data.email, code).await?;
+    // Call send_message with 'to' and 'code' only
+    send_message(&data.email, code, &ses_client).await.map_err(|e| AppError::EmailError(e.to_string()))?;
 
     cache.insert_one(cache_entry, None).await?;
 
@@ -262,6 +261,7 @@ pub async fn verify_login(
 #[post("/login")]
 pub async fn login(
     client: web::Data<Client>,
+    ses_client: web::Data<sesClient>, // Get SES client from app data
     data: web::Json<LoginData>,
 ) -> Result<impl Responder, AppError> {
     let collection = client.database("insights").collection::<User>("users");
@@ -291,37 +291,61 @@ pub async fn login(
         "createdAt": bson::DateTime::from_millis(Utc::now().timestamp_millis()),
     };
 
-    client.database("insights").collection::<Document>("cache").insert_one(cache_entry, None).await?;
+    cache.insert_one(cache_entry, None).await?;
 
-    send_verification_email(&data.email, code).await?;
+    // Call send_message with 'to' and 'code' only
+    send_message(&data.email, code, &ses_client).await.map_err(|e| AppError::EmailError(e.to_string()))?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "Verification code sent" })))
 }
 
-// Email sending function
-pub async fn send_verification_email(email: &str, code: u32) -> Result<(), AppError> {
-    let smtp_credentials = Credentials::new(
-        "forcloudmusic@gmail.com".to_string(),
-        "bhjbjtdxshxsmlky".to_string(),
-    );
+use aws_sdk_sesv2::{Client as sesClient, Error};
+use aws_sdk_sesv2::types::{Body, Content, Destination, EmailContent, Message};
 
-    let mailer = SmtpTransport::relay("smtp.gmail.com")
-        .unwrap()
-        .credentials(smtp_credentials)
+// Email sending function
+async fn send_message(
+    to: &str,
+    code: u32,
+    ses_client: &sesClient,
+) -> Result<(), Error> {
+    let from = "jinwoolee42@outlook.com"; // Use a verified SES email
+    let subject = "Your Verification Code";
+    let message = format!("Your verification code is: {}", code);
+
+    let dest = Destination::builder()
+        .to_addresses(to)
         .build();
 
-    let email_content = format!("Your verification code is: {}", code);
+    let subject_content = Content::builder()
+        .data(subject)
+        .charset("UTF-8")
+        .build()
+        .expect("building Content");
 
-    let email = Message::builder()
-        .from("forcloudmusic@gmail.com".parse().unwrap())
-        .to(email.parse().unwrap())
-        .subject("Verification Code")
-        .header(ContentType::TEXT_PLAIN)
-        .body(email_content)
-        .unwrap();
+    let body_content = Content::builder()
+        .data(&message)
+        .charset("UTF-8")
+        .build()
+        .expect("building Content");
 
-    mailer.send(&email)
-        .map_err(|e| AppError::EmailError(e.to_string()))?;
+    let body = Body::builder().text(body_content).build();
+
+    let msg = Message::builder()
+        .subject(subject_content)
+        .body(body)
+        .build();
+
+    let email_content = EmailContent::builder().simple(msg).build();
+    println!("Register data");
+    ses_client
+        .send_email()
+        .from_email_address(from)
+        .destination(dest)
+        .content(email_content)
+        .send()
+        .await?;
+
+    println!("Email sent to {}", to);
 
     Ok(())
 }
