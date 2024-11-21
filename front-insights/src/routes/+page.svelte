@@ -1,233 +1,98 @@
 <script>
-    let username = '';
-    let email = '';
-    let verificationCode = '';
-    let isRegistering = true;
-    let isVerifying = false;
+    import { browser } from '$app/environment';
+    import { goto } from '$app/navigation';
+    import { auth } from '$lib/stores/auth';
+    import Login from '$lib/components/Login.svelte';
+    import Register from '$lib/components/Register.svelte';
+    import { onMount } from 'svelte';
 
-    let loginEmail = '';
-    let loginVerificationCode = '';
-    let isLoggingIn = false;
+    let isRegistering = false;
 
-    let newUsername = '';
-    let isChangingUsername = false;
-
-    async function register() {
-        const response = await fetch('http://localhost:8080/api/auth/register', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, email })
-        });
-
-        if (response.ok) {
-            isVerifying = true;
-            isRegistering = false;
-            console.log('Verification code sent to email');
-        } else {
-            const error = await response.json();
-            console.error('Registration failed:', error);
-        }
-    }
-
-    async function verifyRegister() {
-        try {
-            const response = await fetch('http://localhost:8080/api/auth/verify/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, email, code: Number(verificationCode) }),
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                console.log('Registration verified successfully');
-            } else {
-                const errorText = await response.text();
-                console.error('Verification failed:', errorText);
+    onMount(async () => {
+        if (browser) {
+            try {
+                const response = await fetch('http://localhost:8080/api/user/get', {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const userInfo = await response.json();
+                    auth.setUser(userInfo);
+                    goto('/dashboard');
+                }
+            } catch (error) {
+                // Ignore error, user is not logged in
             }
-        } catch (err) {
-            console.error('An unexpected error occurred:', err);
         }
-    }
+    });
 
-    let userInfo = null;
-
-    async function getUserInfo() {
-        const response = await fetch('http://localhost:8080/api/user/get', {
-            method: 'GET',
-            credentials: 'include'
-        });
-
-        if (response.ok) {
-            userInfo = await response.json();
-            console.log('User info:', userInfo);
-        } else {
-            console.error('Failed to fetch user info');
-        }
-    }
-
-    async function login() {
-        console.log(loginEmail)
-        const response = await fetch('http://localhost:8080/api/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ "email": loginEmail })
-        });
-
-        if (response.ok) {
-            isLoggingIn = true;
-            console.log('Verification code sent to email');
-        } else {
-            const error = await response.json();
-            console.error('Login failed:', error);
-        }
-    }
-
-    async function verifyLogin() {
-        try {
-            const response = await fetch('http://localhost:8080/api/auth/verify/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ email: loginEmail, code: Number(loginVerificationCode) }),
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                console.log('Login verified successfully');
-            } else {
-                const errorText = await response.text();
-                console.error('Verification failed:', errorText);
-            }
-        } catch (err) {
-            console.error('An unexpected error occurred:', err);
-        }
-    }
-
-    async function changeUsername() {
-        try {
-            const response = await fetch('http://localhost:8080/api/user/username', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ "username": newUsername }),
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                console.log('Username changed successfully');
-            } else {
-                const error = await response.json();
-                console.error('Change username failed:', error);
-            }
-        } catch (err) {
-            console.error('An unexpected error occurred:', err);
-        }
+    // If user is already logged in, redirect to dashboard
+    $: if (browser && $auth.userInfo) {
+        goto('/dashboard');
     }
 </script>
 
-<div class="flex space-x-4 p-4">
-    <div class="w-1/2">
-        <h2 class="text-lg font-semibold mb-2">Register</h2>
-        <form on:submit|preventDefault={register} class="space-y-4 border rounded-md p-4 shadow-md">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">
-                    Username:
-                    <input type="text" bind:value={username} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                </label>
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex-shrink-0">
+                    <h1 class="text-2xl font-bold text-gray-900">Insights</h1>
+                </div>
+                <div>
+                    <button
+                        class="text-gray-600 hover:text-gray-900"
+                        on:click={() => isRegistering = !isRegistering}
+                    >
+                        {isRegistering ? 'Already have an account?' : 'Need an account?'}
+                    </button>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">
-                    Email:
-                    <input type="email" bind:value={email} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                </label>
+        </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <!-- Left side: App description -->
+            <div class="flex flex-col justify-center">
+                <h2 class="text-4xl font-extrabold text-gray-900 mb-4">
+                    Welcome to Insights
+                </h2>
+                <p class="text-xl text-gray-500">
+                    Your personal analytics dashboard for tracking and visualizing data insights.
+                </p>
+                <div class="mt-8 space-y-4">
+                    <div class="flex items-center">
+                        <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span class="ml-3 text-gray-700">Real-time data visualization</span>
+                    </div>
+                    <div class="flex items-center">
+                        <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span class="ml-3 text-gray-700">Customizable dashboards</span>
+                    </div>
+                    <div class="flex items-center">
+                        <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span class="ml-3 text-gray-700">Advanced analytics tools</span>
+                    </div>
+                </div>
             </div>
-            <div>
-                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Register
-                </button>
+
+            <!-- Right side: Auth forms -->
+            <div class="bg-white shadow-xl rounded-lg p-8">
+                {#if isRegistering}
+                    <Register />
+                {:else}
+                    <Login />
+                {/if}
             </div>
-        </form>
-    </div>
-    <div class="w-1/2">
-        <h2 class="text-lg font-semibold mb-2">Login</h2>
-        <form on:submit|preventDefault={login} class="space-y-4 border rounded-md p-4 shadow-md">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">
-                    Email:
-                    <input type="email" bind:value={loginEmail} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                </label>
-            </div>
-            <div>
-                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Login
-                </button>
-            </div>
-        </form>
-    </div>
+        </div>
+    </main>
 </div>
-
-{#if isVerifying}
-    <form on:submit|preventDefault={verifyRegister} class="space-y-4 p-4 border rounded-md shadow-md">
-        <div>
-            <label class="block text-sm font-medium text-gray-700">
-                Verification Code:
-                <input type="text" bind:value={verificationCode} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-            </label>
-        </div>
-        <div>
-            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Verify
-            </button>
-        </div>
-    </form>
-{/if}
-
-{#if isLoggingIn}
-    <form on:submit|preventDefault={verifyLogin} class="space-y-4 p-4 border rounded-md shadow-md">
-        <div>
-            <label class="block text-sm font-medium text-gray-700">
-                Verification Code:
-                <input type="text" bind:value={loginVerificationCode} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-            </label>
-        </div>
-        <div>
-            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Verify Login
-            </button>
-        </div>
-    </form>
-{/if}
-
-<div class="mt-6">
-    <form on:submit|preventDefault={getUserInfo} class="space-y-4 p-4 border rounded-md shadow-md">
-        <div>
-            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Get User Info
-            </button>
-        </div>
-    </form>
-</div>
-
-{#if userInfo}
-    <form on:submit|preventDefault={changeUsername} class="space-y-4 p-4 border rounded-md shadow-md">
-        <div>
-            <label class="block text-sm font-medium text-gray-700">
-                New Username:
-                <input type="text" bind:value={newUsername} required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-            </label>
-        </div>
-        <div>
-            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Change Username
-            </button>
-        </div>
-    </form>
-{/if}

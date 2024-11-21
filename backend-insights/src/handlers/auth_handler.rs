@@ -299,6 +299,22 @@ pub async fn login(
     Ok(HttpResponse::Ok().json(serde_json::json!({ "message": "Verification code sent" })))
 }
 
+#[post("/logout")]
+pub async fn logout() -> Result<impl Responder, AppError> {
+    // Create an empty cookie with immediate expiration to remove the token
+    let cookie = Cookie::build("token", "")
+        .path("/")
+        .http_only(true)
+        .secure(true)
+        .same_site(actix_web::cookie::SameSite::Strict)
+        .expires(actix_web::cookie::time::OffsetDateTime::now_utc())
+        .finish();
+
+    Ok(HttpResponse::Ok()
+        .cookie(cookie)
+        .json(serde_json::json!({ "message": "Logged out successfully" })))
+}
+
 use aws_sdk_sesv2::{Client as sesClient, Error};
 use aws_sdk_sesv2::types::{Body, Content, Destination, EmailContent, Message};
 
